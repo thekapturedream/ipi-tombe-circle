@@ -38,6 +38,9 @@ for (const maker of makers) {
     db.collection("makers").doc(maker.id),
     {
       ...maker,
+      // Publish every maker so the live public grid matches the launch site.
+      // Unpublish any of them later from the admin dashboard.
+      status: "Published",
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     },

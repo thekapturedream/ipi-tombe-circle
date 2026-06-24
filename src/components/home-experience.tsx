@@ -14,8 +14,15 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { FormEvent, useMemo, useState } from "react";
+import {
+  addDoc,
+  collection,
+  getDocs,
+  query,
+  serverTimestamp,
+  where,
+} from "firebase/firestore";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { makerCategories, makers, type Maker } from "@/data/makers";
 import { db, firebaseReady } from "@/lib/firebase";
 import { CircleMark, Wordmark } from "@/components/brand";
@@ -80,13 +87,39 @@ export default function HomeExperience() {
   const [formState, setFormState] = useState<
     "idle" | "submitting" | "success" | "error"
   >("idle");
+  // Public grid is server-rendered from the bundled list for instant load,
+  // then refreshed with the live Published makers from Firestore so admin
+  // edits and publish/unpublish changes reach the public site.
+  const [liveMakers, setLiveMakers] = useState<Maker[]>(makers);
+
+  useEffect(() => {
+    if (!firebaseReady || !db) return;
+    let active = true;
+    (async () => {
+      try {
+        const snapshot = await getDocs(
+          query(collection(db, "makers"), where("status", "==", "Published")),
+        );
+        if (!active || snapshot.empty) return;
+        const next = snapshot.docs
+          .map((docSnap) => ({ ...(docSnap.data() as Maker), id: docSnap.id }))
+          .sort((a, b) => a.stall - b.stall);
+        setLiveMakers(next);
+      } catch {
+        // Firestore unavailable — keep the bundled list so the page still works.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const filteredMakers = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return makers.filter((maker) => {
+    const queryText = search.trim().toLowerCase();
+    return liveMakers.filter((maker) => {
       const categoryMatch = category === "All" || maker.category === category;
       const searchMatch =
-        !query ||
+        !queryText ||
         [
           maker.brand,
           maker.makers.join(" "),
@@ -96,10 +129,10 @@ export default function HomeExperience() {
         ]
           .join(" ")
           .toLowerCase()
-          .includes(query);
+          .includes(queryText);
       return categoryMatch && searchMatch;
     });
-  }, [category, search]);
+  }, [category, search, liveMakers]);
 
   const displayMakers = useMemo(() => {
     if (category !== "All" || search.trim()) return filteredMakers;
@@ -260,14 +293,24 @@ export default function HomeExperience() {
                       : ""
                   }`}
                   key={maker.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`View ${maker.brand}`}
+                  onClick={() => setSelectedMaker(maker)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setSelectedMaker(maker);
+                    }
+                  }}
                 >
-                  <button className="maker-card__image" onClick={() => setSelectedMaker(maker)} aria-label={`View ${maker.brand}`}>
+                  <div className="maker-card__image">
                     <MakerImage
                       maker={maker}
                       sizes={maker.id === "back-to-earth" ? "(max-width: 900px) 100vw, 40vw" : "(max-width: 700px) 50vw, 20vw"}
                       priority={index < 4}
                     />
-                  </button>
+                  </div>
                   <div className="maker-card__content">
                     <span className="maker-card__stall">Stall {maker.stall}</span>
                     <h3>{maker.brand}</h3>
@@ -279,9 +322,9 @@ export default function HomeExperience() {
                         <p className="maker-card__description">{maker.description}</p>
                       </>
                     )}
-                    <button className="text-link" onClick={() => setSelectedMaker(maker)}>
+                    <span className="text-link maker-card__cue" aria-hidden="true">
                       View maker <ArrowRight size={16} />
-                    </button>
+                    </span>
                   </div>
                 </article>
               ))
