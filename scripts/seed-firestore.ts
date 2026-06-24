@@ -73,10 +73,16 @@ if (process.env.ADMIN_UID) {
   );
 }
 
-await batch.commit();
-
-console.log(
-  `Seeded ${makers.length} makers, venue content and ${
-    process.env.ADMIN_UID ? "one admin record" : "no admin record"
-  } into ${projectId}.`,
-);
+batch
+  .commit()
+  .then(() => {
+    console.log(
+      `Seeded ${makers.length} makers, venue content and ${
+        process.env.ADMIN_UID ? "one admin record" : "no admin record"
+      } into ${projectId}.`,
+    );
+  })
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
