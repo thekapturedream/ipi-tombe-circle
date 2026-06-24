@@ -584,7 +584,7 @@ img.object-contain {
   display: grid;
   max-width: var(--content);
   grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+  gap: 24px;
   margin: 0 auto;
 }
 
@@ -594,8 +594,9 @@ img.object-contain {
   grid-template-rows: 260px auto;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(255, 253, 248, 0.62);
+  cursor: pointer;
   transition:
     box-shadow 220ms ease,
     transform 220ms ease,
@@ -606,6 +607,12 @@ img.object-contain {
   border-color: rgba(167, 17, 45, 0.45);
   box-shadow: 0 18px 40px rgba(62, 42, 20, 0.1);
   transform: translateY(-4px);
+}
+
+.maker-card:focus-visible {
+  outline: none;
+  border-color: rgba(167, 17, 45, 0.6);
+  box-shadow: 0 0 0 3px rgba(167, 17, 45, 0.28);
 }
 
 .maker-card__image {
