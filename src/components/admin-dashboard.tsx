@@ -43,6 +43,14 @@ type Enquiry = {
   status: string;
 };
 
+type SectionName =
+  | "Overview"
+  | "Makers"
+  | "Media"
+  | "Enquiries"
+  | "Updates"
+  | "Settings";
+
 const demoEnquiries: Enquiry[] = [
   { id: "1", name: "Sarah Chitongo", interest: "Partnership & collaboration for opening day feature", status: "New" },
   { id: "2", name: "Tendai M.", interest: "Interested in exhibiting in a shared space", status: "Open" },
@@ -59,14 +67,21 @@ const navItems = [
   [Settings, "Settings"],
 ] as const;
 
+const statusCycle = ["All statuses", "Published", "Needs copy"];
+const enquiryStatuses = ["New", "Open", "Replied", "Closed"];
+const PAGE_SIZE = 9;
+
 export default function AdminDashboard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(firebaseReady && Boolean(auth));
   const [mobileNav, setMobileNav] = useState(false);
+  const [section, setSection] = useState<SectionName>("Overview");
   const [makerList, setMakerList] = useState<Maker[]>(seedMakers);
   const [enquiries, setEnquiries] = useState<Enquiry[]>(demoEnquiries);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All statuses");
+  const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Maker | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [updateState, setUpdateState] = useState<"idle" | "saving" | "saved">("idle");
@@ -124,14 +139,83 @@ export default function AdminDashboard() {
 
   const filteredMakers = useMemo(() => {
     const queryText = search.trim().toLowerCase();
-    if (!queryText) return makerList;
-    return makerList.filter((maker) =>
-      [maker.brand, maker.makers.join(" "), maker.craft, `stall ${maker.stall}`]
-        .join(" ")
-        .toLowerCase()
-        .includes(queryText),
+    return makerList.filter((maker) => {
+      const matchesSearch =
+        !queryText ||
+        [maker.brand, maker.makers.join(" "), maker.craft, `stall ${maker.stall}`]
+          .join(" ")
+          .toLowerCase()
+          .includes(queryText);
+      const matchesStatus =
+        statusFilter === "All statuses" || maker.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [makerList, search, statusFilter]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredMakers.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const pagedMakers = filteredMakers.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE,
+  );
+
+  const mediaItems = useMemo(
+    () =>
+      makerList.flatMap((maker) =>
+        maker.images.map((src, index) => ({
+          maker,
+          src,
+          key: `${maker.id}-${index}`,
+        })),
+      ),
+    [makerList],
+  );
+
+  function goToSection(next: SectionName) {
+    setSection(next);
+    setMobileNav(false);
+  }
+
+  function cycleStatusFilter() {
+    setPage(1);
+    setStatusFilter(
+      (current) => statusCycle[(statusCycle.indexOf(current) + 1) % statusCycle.length],
     );
-  }, [makerList, search]);
+  }
+
+  function cycleEnquiryStatus(id: string) {
+    setEnquiries((current) =>
+      current.map((enquiry) =>
+        enquiry.id === id
+          ? {
+              ...enquiry,
+              status:
+                enquiryStatuses[
+                  (enquiryStatuses.indexOf(enquiry.status) + 1) % enquiryStatuses.length
+                ],
+            }
+          : enquiry,
+      ),
+    );
+  }
+
+  function startAddMaker() {
+    const nextStall = makerList.reduce((max, maker) => Math.max(max, maker.stall), 0) + 1;
+    setEditing({
+      ...seedMakers[0],
+      id: `maker-${Date.now()}`,
+      brand: "",
+      makers: [""],
+      stall: nextStall,
+      category: "Home" as MakerCategory,
+      craft: "",
+      description: "",
+      email: [],
+      phone: [],
+      images: [],
+      status: "Needs copy",
+    });
+  }
 
   async function saveMaker(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -164,9 +248,12 @@ export default function AdminDashboard() {
         { merge: true },
       );
     }
-    setMakerList((current) =>
-      current.map((maker) => (maker.id === updated.id ? updated : maker)),
-    );
+    setMakerList((current) => {
+      const exists = current.some((maker) => maker.id === updated.id);
+      return exists
+        ? current.map((maker) => (maker.id === updated.id ? updated : maker))
+        : [...current, updated];
+    });
     setSaveState("saved");
     window.setTimeout(() => {
       setEditing(null);
@@ -208,6 +295,93 @@ export default function AdminDashboard() {
     );
   }
 
+  const directoryPanel = (
+    <section className="admin-panel admin-directory-panel">
+      <div className="admin-panel__header">
+        <h2>Maker directory</h2>
+        <button aria-label="Open makers view" onClick={() => goToSection("Makers")}><MoreHorizontal /></button>
+      </div>
+      <div className="admin-table-tools">
+        <label>
+          <Search size={17} />
+          <input
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
+            placeholder="Search makers…"
+          />
+        </label>
+        <button onClick={cycleStatusFilter}>{statusFilter} <ChevronDown size={15} /></button>
+      </div>
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead><tr><th>Maker</th><th>Stall</th><th>Category</th><th>Profile</th><th>Media</th><th>Updated</th><th /></tr></thead>
+          <tbody>
+            {pagedMakers.map((maker) => (
+              <tr key={maker.id}>
+                <td><div className="admin-maker"><span className="admin-maker__image">{maker.images[0] ? <Image src={maker.images[0]} alt="" fill sizes="42px" /> : <CircleMark />}</span><span><strong>{maker.brand || "Untitled maker"}</strong><small>{maker.makers.join(" & ")}</small></span></div></td>
+                <td>{maker.stall}</td><td>{maker.category}<br /><small>{maker.craft}</small></td>
+                <td><span className={`admin-status admin-status--${maker.status.toLowerCase().replaceAll(" ", "-")}`}>{maker.status}</span></td>
+                <td>{maker.images.length} {maker.images.length === 1 ? "photo" : "photos"}</td>
+                <td>23 Jun 2026</td>
+                <td><button className="admin-row-action" aria-label={`Edit ${maker.brand}`} onClick={() => setEditing(maker)}><MoreHorizontal /></button></td>
+              </tr>
+            ))}
+            {pagedMakers.length === 0 && (
+              <tr><td colSpan={7} className="admin-table-empty">No makers match your search or filter.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="admin-pagination">
+        <span>
+          {filteredMakers.length === 0
+            ? "0"
+            : `${(safePage - 1) * PAGE_SIZE + 1}–${Math.min(safePage * PAGE_SIZE, filteredMakers.length)}`}{" "}
+          of {filteredMakers.length}
+        </span>
+        <div>
+          {Array.from({ length: pageCount }, (_, index) => index + 1).map((pageNumber) => (
+            <button
+              key={pageNumber}
+              className={pageNumber === safePage ? "is-active" : ""}
+              onClick={() => setPage(pageNumber)}
+            >
+              {pageNumber}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+
+  const composerPanel = (
+    <section className="admin-panel admin-composer">
+      <div className="admin-panel__header"><h2>Opening update</h2><span>Share with the Circle</span></div>
+      <form onSubmit={publishUpdate}>
+        <textarea name="message" defaultValue={"We are officially opening on 01 July 2026 at Borrowdale Race Course in Harare.\n\nWe can’t wait to celebrate Zimbabwean creativity together."} />
+        <div><button className="button button--primary">{updateState === "saving" ? "Publishing…" : updateState === "saved" ? "Published" : "Publish update"}</button></div>
+      </form>
+    </section>
+  );
+
+  const enquiryList = (full: boolean) => (
+    <div className="admin-enquiry-list">
+      {enquiries.map((enquiry) => (
+        <article key={enquiry.id} className="admin-enquiry-item" onClick={() => cycleEnquiryStatus(enquiry.id)} title="Click to change status">
+          <span className="admin-enquiry-avatar">{enquiry.name.split(" ").map((part) => part[0]).join("").slice(0, 2)}</span>
+          <div>
+            <div><strong>{enquiry.name}</strong><span className={`admin-mini-status admin-mini-status--${enquiry.status.toLowerCase()}`}>{enquiry.status}</span></div>
+            <p>{enquiry.interest}</p>
+            {full && enquiry.email && <small className="admin-enquiry-email">{enquiry.email}</small>}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+
   return (
     <main className="admin-shell">
       <aside className={`admin-sidebar ${mobileNav ? "admin-sidebar--open" : ""}`}>
@@ -216,19 +390,23 @@ export default function AdminDashboard() {
           <button onClick={() => setMobileNav(false)} aria-label="Close navigation"><X /></button>
         </div>
         <nav>
-          {navItems.map(([Icon, label], index) => (
-            <button className={index === 0 ? "is-active" : ""} key={label}>
+          {navItems.map(([Icon, label]) => (
+            <button
+              className={section === label ? "is-active" : ""}
+              key={label}
+              onClick={() => goToSection(label)}
+            >
               <Icon size={19} /> {label}
             </button>
           ))}
         </nav>
-        <div className="admin-sidebar__user">
+        <button className="admin-sidebar__user" onClick={() => goToSection("Settings")}>
           <div className="admin-avatar">
             {user?.photoURL ? <Image src={user.photoURL} alt="" fill sizes="40px" /> : <span>RM</span>}
           </div>
           <div><strong>{user?.displayName ?? "Rodney Manyepa"}</strong><span>Administrator</span></div>
           <ChevronDown size={16} />
-        </div>
+        </button>
         <button className="admin-signout" onClick={handleSignOut}><LogOut size={18} /> Sign out</button>
       </aside>
 
@@ -237,68 +415,102 @@ export default function AdminDashboard() {
           <button className="admin-menu" onClick={() => setMobileNav(true)} aria-label="Open navigation"><Menu /></button>
           <div className="admin-topbar__actions">
             {!firebaseReady && <span className="admin-demo-badge">Local demo</span>}
-            <button className="admin-icon-button" aria-label="Notifications"><Bell size={19} /></button>
-            <button className="admin-profile-button"><span>Admin</span><ChevronDown size={15} /></button>
-            <button className="button button--primary" onClick={() => setEditing(seedMakers[0])}><Plus size={18} /> Add maker</button>
+            <button className="admin-icon-button" aria-label="Notifications" onClick={() => goToSection("Enquiries")}><Bell size={19} /></button>
+            <button className="admin-profile-button" onClick={() => goToSection("Settings")}><span>Admin</span><ChevronDown size={15} /></button>
+            <button className="button button--primary" onClick={startAddMaker}><Plus size={18} /> Add maker</button>
           </div>
         </header>
 
         <div className="admin-content">
-          <h1>Circle overview</h1>
-          <section className="admin-stats">
-            <article><span className="admin-stat-icon admin-stat-icon--red"><Store /></span><div><strong>18</strong><p>Active stalls</p><small>Makers with public profiles</small></div></article>
-            <article><span className="admin-stat-icon admin-stat-icon--gold"><Users /></span><div><strong>2</strong><p>Shared spaces</p><small>Available for exhibitions</small></div></article>
-            <article><span className="admin-stat-icon admin-stat-icon--green">#</span><div><strong>20</strong><p>Numbered stalls</p><small>Stalls 1–20 in total</small></div></article>
-          </section>
-
-          <div className="admin-workspace">
-            <section className="admin-panel admin-directory-panel">
-              <div className="admin-panel__header"><h2>Maker directory</h2><button aria-label="More options"><MoreHorizontal /></button></div>
-              <div className="admin-table-tools">
-                <label><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search makers…" /></label>
-                <button>All statuses <ChevronDown size={15} /></button>
+          {section === "Overview" && (
+            <>
+              <h1>Circle overview</h1>
+              <section className="admin-stats">
+                <article><span className="admin-stat-icon admin-stat-icon--red"><Store /></span><div><strong>{makerList.length}</strong><p>Active stalls</p><small>Makers with public profiles</small></div></article>
+                <article><span className="admin-stat-icon admin-stat-icon--gold"><Users /></span><div><strong>2</strong><p>Shared spaces</p><small>Available for exhibitions</small></div></article>
+                <article><span className="admin-stat-icon admin-stat-icon--green">#</span><div><strong>20</strong><p>Numbered stalls</p><small>Stalls 1–20 in total</small></div></article>
+              </section>
+              <div className="admin-workspace">
+                {directoryPanel}
+                <aside className="admin-rail">
+                  <section className="admin-panel admin-enquiries">
+                    <div className="admin-panel__header"><h2>Recent enquiries</h2><button onClick={() => goToSection("Enquiries")}>View all</button></div>
+                    {enquiryList(false)}
+                  </section>
+                  {composerPanel}
+                </aside>
               </div>
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead><tr><th>Maker</th><th>Stall</th><th>Category</th><th>Profile</th><th>Media</th><th>Updated</th><th /></tr></thead>
-                  <tbody>
-                    {filteredMakers.map((maker) => (
-                      <tr key={maker.id}>
-                        <td><div className="admin-maker"><span className="admin-maker__image">{maker.images[0] ? <Image src={maker.images[0]} alt="" fill sizes="42px" /> : <CircleMark />}</span><span><strong>{maker.brand}</strong><small>{maker.makers.join(" & ")}</small></span></div></td>
-                        <td>{maker.stall}</td><td>{maker.category}<br /><small>{maker.craft}</small></td>
-                        <td><span className={`admin-status admin-status--${maker.status.toLowerCase().replaceAll(" ", "-")}`}>{maker.status}</span></td>
-                        <td>{maker.images.length} {maker.images.length === 1 ? "photo" : "photos"}</td>
-                        <td>23 Jun 2026</td>
-                        <td><button className="admin-row-action" onClick={() => setEditing(maker)}><MoreHorizontal /></button></td>
-                      </tr>
+            </>
+          )}
+
+          {section === "Makers" && (
+            <>
+              <h1>Makers</h1>
+              {directoryPanel}
+            </>
+          )}
+
+          {section === "Media" && (
+            <>
+              <h1>Media library</h1>
+              <section className="admin-panel">
+                <div className="admin-panel__header"><h2>All photos</h2><span>{mediaItems.length} {mediaItems.length === 1 ? "photo" : "photos"}</span></div>
+                {mediaItems.length === 0 ? (
+                  <p className="admin-empty-note">No media uploaded yet.</p>
+                ) : (
+                  <div className="admin-media-grid">
+                    {mediaItems.map(({ maker, src, key }) => (
+                      <figure key={key}>
+                        <div className="admin-media-thumb"><Image src={src} alt={maker.brand} fill sizes="(max-width: 700px) 33vw, 150px" /></div>
+                        <figcaption>{maker.brand}<small>Stall {maker.stall}</small></figcaption>
+                      </figure>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="admin-pagination"><span>1–{filteredMakers.length} of {makerList.length}</span><div><button className="is-active">1</button><button>2</button></div></div>
-            </section>
+                  </div>
+                )}
+              </section>
+            </>
+          )}
 
-            <aside className="admin-rail">
-              <section className="admin-panel admin-enquiries">
-                <div className="admin-panel__header"><h2>Recent enquiries</h2><button>View all</button></div>
-                <div className="admin-enquiry-list">
-                  {enquiries.map((enquiry) => (
-                    <article key={enquiry.id}>
-                      <span className="admin-enquiry-avatar">{enquiry.name.split(" ").map((part) => part[0]).join("").slice(0, 2)}</span>
-                      <div><div><strong>{enquiry.name}</strong><span className={`admin-mini-status admin-mini-status--${enquiry.status.toLowerCase()}`}>{enquiry.status}</span></div><p>{enquiry.interest}</p></div>
-                    </article>
-                  ))}
+          {section === "Enquiries" && (
+            <>
+              <h1>Enquiries</h1>
+              <section className="admin-panel">
+                <div className="admin-panel__header"><h2>All enquiries</h2><span>{enquiries.length} total</span></div>
+                {enquiryList(true)}
+              </section>
+            </>
+          )}
+
+          {section === "Updates" && (
+            <>
+              <h1>Updates</h1>
+              {composerPanel}
+            </>
+          )}
+
+          {section === "Settings" && (
+            <>
+              <h1>Settings</h1>
+              <div className="admin-settings-grid">
+                <div className="admin-setting-card">
+                  <h3>Venue</h3>
+                  <p>Borrowdale Race Course</p>
+                  <p>Harare, Zimbabwe</p>
+                  <p>Opening 01 July 2026</p>
                 </div>
-              </section>
-              <section className="admin-panel admin-composer">
-                <div className="admin-panel__header"><h2>Opening update</h2><span>Share with the Circle</span></div>
-                <form onSubmit={publishUpdate}>
-                  <textarea name="message" defaultValue={"We are officially opening on 01 July 2026 at Borrowdale Race Course in Harare.\n\nWe can’t wait to celebrate Zimbabwean creativity together."} />
-                  <div><button className="button button--primary">{updateState === "saving" ? "Publishing…" : updateState === "saved" ? "Published" : "Publish update"}</button></div>
-                </form>
-              </section>
-            </aside>
-          </div>
+                <div className="admin-setting-card">
+                  <h3>Account</h3>
+                  <p>{user?.email ?? user?.displayName ?? "Administrator"}</p>
+                  <button className="button button--outline" onClick={handleSignOut}><LogOut size={16} /> Sign out</button>
+                </div>
+                <div className="admin-setting-card">
+                  <h3>Data source</h3>
+                  <p>{firebaseReady ? "Connected to Firestore" : "Local demo mode"}</p>
+                  <p>{makerList.length} makers loaded</p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -306,7 +518,7 @@ export default function AdminDashboard() {
         <div className="admin-drawer-shell">
           <button className="admin-drawer-backdrop" onClick={() => setEditing(null)} aria-label="Close editor" />
           <aside className="admin-drawer">
-            <header><h2>Edit maker</h2><button onClick={() => setEditing(null)}><X /></button></header>
+            <header><h2>{makerList.some((maker) => maker.id === editing.id) ? "Edit maker" : "Add maker"}</h2><button onClick={() => setEditing(null)}><X /></button></header>
             <form onSubmit={saveMaker}>
               <label><span>Brand name *</span><input name="brand" defaultValue={editing.brand} required /></label>
               <label><span>Maker name *</span><input name="maker" defaultValue={editing.makers.join(", ")} required /></label>
