@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
 import "./globals.css";
+import { absoluteUrl, siteDescription, siteName, siteUrl } from "@/lib/seo";
 
 const display = Cormorant_Garamond({
   variable: "--font-display",
@@ -15,12 +16,14 @@ const sans = Manrope({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: {
-    default: "Ipi Tombe Circle | Zimbabwean creativity, gathered",
+    default: "Zimbabwean Art & Craft in Harare | Ipi Tombe Circle",
     template: "%s | Ipi Tombe Circle",
   },
-  description:
-    "A collective of Zimbabwean artists, artisans, creators and crafters at Borrowdale Race Course in Harare.",
+  description: siteDescription,
+  applicationName: siteName,
+  alternates: { canonical: "/" },
   keywords: [
     "Zimbabwean artists",
     "Harare craft",
@@ -29,12 +32,22 @@ export const metadata: Metadata = {
     "Ipi Tombe Circle",
   ],
   openGraph: {
-    title: "Ipi Tombe Circle",
-    description:
-      "Made by hand. Held in community. Opening 01 July 2026 in Harare.",
+    title: "Made here. Found in Harare.",
+    description: siteDescription,
     type: "website",
     locale: "en_ZW",
+    url: "/",
+    siteName,
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "Zimbabwean art and craft at Ipi Tombe Circle" }],
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Made here. Found in Harare.",
+    description: "Meet 18 Zimbabwean makers. One remarkable circle.",
+    images: ["/twitter-image"],
+  },
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } },
+  category: "arts and crafts",
 };
 
 export const viewport: Viewport = {
@@ -50,11 +63,49 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="en-ZW"
       className={`${display.variable} ${sans.variable}`}
       data-scroll-behavior="smooth"
     >
-      <body>{children}</body>
+      <body>
+        {children}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "WebSite",
+                  "@id": `${siteUrl}/#website`,
+                  url: siteUrl,
+                  name: siteName,
+                  alternateName: "Ipi Tombe",
+                  description: siteDescription,
+                  inLanguage: "en-ZW",
+                },
+                {
+                  "@type": ["LocalBusiness", "Store"],
+                  "@id": `${siteUrl}/#circle`,
+                  name: siteName,
+                  url: siteUrl,
+                  image: absoluteUrl("/opengraph-image"),
+                  description: siteDescription,
+                  address: {
+                    "@type": "PostalAddress",
+                    streetAddress: "Borrowdale Race Course",
+                    addressLocality: "Harare",
+                    addressCountry: "ZW",
+                  },
+                  hasMap: "https://www.google.com/maps/search/?api=1&query=Borrowdale+Race+Course+Harare",
+                  areaServed: { "@type": "City", name: "Harare" },
+                  currenciesAccepted: "USD, ZWG",
+                },
+              ],
+            }).replace(/</g, "\\u003c"),
+          }}
+        />
+      </body>
     </html>
   );
 }

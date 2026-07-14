@@ -214,7 +214,7 @@ export default function HomeExperience() {
             </h1>
             <p>A living circle of Zimbabwean artists, artisans, creators and crafters.</p>
             <div className="hero-copy__stroke" />
-            <strong>Opening 01 July 2026 · Borrowdale Race Course, Harare</strong>
+            <strong>Now open · Borrowdale Race Course, Harare</strong>
             <button className="button button--primary" onClick={() => scrollTo("discover")}>
               Explore the makers <ArrowRight size={18} />
             </button>
@@ -313,7 +313,7 @@ export default function HomeExperience() {
                   </div>
                   <div className="maker-card__content">
                     <span className="maker-card__stall">Stall {maker.stall}</span>
-                    <h3>{maker.brand}</h3>
+                    <h3><a href={`/makers/${maker.id}`} onClick={(event) => event.stopPropagation()}>{maker.brand}</a></h3>
                     <span className="maker-card__category">{maker.category}</span>
                     <p>{maker.craft}</p>
                     {maker.id === "back-to-earth" && (
@@ -346,7 +346,7 @@ export default function HomeExperience() {
             <CircleMark />
             <h2>Come into<br />the Circle</h2>
             <div className="section-stroke" />
-            <h3>Opening Wednesday, 01 July 2026</h3>
+            <h3>Zimbabwean creativity. Here, now.</h3>
             <strong>Borrowdale Race Course, Harare</strong>
             <p>A beautiful indoor space for handmade Zimbabwean ware.</p>
             <div className="visit-actions">
@@ -354,7 +354,7 @@ export default function HomeExperience() {
                 Plan your visit <ArrowRight size={18} />
               </a>
               <button className="button button--outline" onClick={() => document.getElementById("updates-email")?.focus()}>
-                Get opening updates <ArrowRight size={18} />
+                Get Circle updates <ArrowRight size={18} />
               </button>
             </div>
           </div>
@@ -388,8 +388,8 @@ export default function HomeExperience() {
         <section className="updates-section">
           <div>
             <CalendarDays />
-            <h2>Be there at the beginning.</h2>
-            <p>Join the opening list for news from the Circle, new maker stories and exhibition announcements.</p>
+            <h2>Stay close to what’s next.</h2>
+            <p>New makers. New stories. New reasons to come back.</p>
           </div>
           <form className="updates-form" onSubmit={submitUpdates}>
             <label><span>Name</span><input name="name" required autoComplete="name" placeholder="Your name" /></label>

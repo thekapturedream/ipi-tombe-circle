@@ -2777,3 +2777,13 @@ img.object-contain {
   margin-top: 10px;
   align-self: flex-start;
 }
+.maker-profile-page { min-height: 100vh; padding: clamp(24px, 5vw, 72px); background: #f7f3eb; color: #173a32; }
+.maker-profile-page__grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: clamp(32px, 6vw, 96px); margin-top: 40px; align-items: start; }
+.maker-profile-page__gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.maker-profile-page__gallery img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; }
+.maker-profile-page__gallery img:first-child { grid-column: 1 / -1; aspect-ratio: 16 / 10; }
+.maker-profile-page h1 { font-family: var(--font-display); font-size: clamp(48px, 7vw, 88px); line-height: .95; margin: 24px 0; }
+.maker-profile-page h2 { font-size: 16px; text-transform: uppercase; letter-spacing: .12em; }
+.maker-profile-page article p { font-size: 18px; line-height: 1.7; margin: 28px 0; }
+.maker-profile-page__placeholder { min-height: 520px; display: grid; place-items: center; background: #e9e0d2; }
+@media (max-width: 760px) { .maker-profile-page__grid { grid-template-columns: 1fr; } }
